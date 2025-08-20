@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 5px;
+        }
+
+        .cell {
+            width: 100px;
+            height: 100px;
+            font-size: 2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #333;
+            cursor: pointer;
+        }
+
+        #status {
+            margin-top: 20px;
+            font-size: 1.5em;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Tic Tac Toe</h2>
+    <div id="board">
+        <div class="cell" data-index="0"></div>
+        <div class="cell" data-index="1"></div>
+        <div class="cell" data-index="2"></div>
+        <div class="cell" data-index="3"></div>
+        <div class="cell" data-index="4"></div>
+        <div class="cell" data-index="5"></div>
+        <div class="cell" data-index="6"></div>
+        <div class="cell" data-index="7"></div>
+        <div class="cell" data-index="8"></div>
+    </div>
+    <div id="status"></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        socket.on("connect", () => {
+            console.log("Connected with ID:", socket.id);
+        });
+
+        const board = document.getElementById('board');
+        const cells = document.querySelectorAll('.cell');
+        const status = document.getElementById('status');
+        let mySymbol = null;
+        let currentTurn = null;
+
+        socket.on('joined', (symbol) => {
+            console.log(symbol)
+            mySymbol = symbol;
+            status.innerText = `You are Player ${symbol}`;
+        })
+
+        socket.on('start', ({ board, currPlayer }) => {
+            updateBoard(board);
+            currentTurn = currPlayer;
+            status.innerText += currentTurn === mySymbol ? `\nYour turn` : `\nOpponent's turn`;
+        });
+
+
+
+        cells.forEach(cell => {
+            cell.addEventListener('click', () => {
+                if (cell.textContent === '' && mySymbol === currentTurn) {
+                    // console.log('click')
+                    cell.innerText = mySymbol
+                    socket.emit('makeMove', {
+                        index: cell.getAttribute('data-index'),
+                        player: mySymbol
+                    });
+                }
+            });
+        });
+
+        socket.on('update', ({ board, currPlayer }) => {
+            updateBoard(board);
+            console.log(currPlayer)
+            currentTurn = currPlayer;
+            status.textContent = currentTurn === mySymbol ? "Your turn" : "Opponent's turn";
+        });
+
+        socket.on('gameOver', ({ board, winner }) => {
+            console.log(board, winner, "last")
+            updateBoard(board);
+            if (winner === 'Draw') {
+                status.textContent = "It's a draw!";
+                alert(`It's a draw!`)
+            } else if (winner === mySymbol) {
+                status.textContent = `${mySymbol} : You win!`;
+                alert(`${mySymbol} : You win!`)
+                // window.location.reload()
+            } else {
+                status.textContent = `${mySymbol} : You lose!`;
+                alert(`${mySymbol} : You lose!`)
+                // window.location.reload()
+            }
+            cells.forEach(cell => cell.textContent = '');
+            currentTurn='X'
+        });
+
+        socket.on('leave', (data) => {
+            console.log(data, "data")
+            currentTurn = null;
+            // mySymbol = null;
+            console.log(mySymbol, "synn")
+            console.log(board, "board")
+            updateBoard(Array(9).fill(null));
+
+            alert('Another user is disconnected')
+            // if (data.players[0].symbol === 'O') {
+            //     console.log("object")
+            //     socket.emit('joined','O')
+            // }
+        })
+
+        socket.on('full', (data) => {
+            status.textContent = data;
+        });
+
+        function updateBoard(board) {
+            console.log(board)
+            cells.forEach((cell, index) => {
+                cell.textContent = board[index] || '';
+            });
+        }
+    </script>
+</body>
+
+</html>

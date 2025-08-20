@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            /* border: 1px solid #ccc; */
+        }
+
+        .chat-box {
+            height: 300px;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 6px 10px;
+            border-radius: 8px;
+        }
+
+        .my-message {
+            align-self: flex-end;
+            background: #d1e7dd;
+            margin-bottom: 7px;
+        }
+
+        .other-message {
+            align-self: flex-start;
+            background: #f8d7da;
+            margin-bottom: 7px;
+
+        }
+
+        #input-container {
+            margin-bottom: 10px;
+        }
+
+        .input-area {
+            display: flex;
+            border-top: 1px solid #ccc;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            outline: none;
+        }
+
+        .input-area button {
+            padding: 8px 12px;
+            border: none;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Chat Platform</h2>
+
+    <!-- <div class="name-input">
+        <input type="text" id="username" placeholder="Enter your name" />
+    </div> -->
+
+    <div class="chat-container">
+
+        <div class="input-container" id="input-container">
+            <label for="userDropdown">Send to:</label>
+            <select id="userDropdown"></select>
+            <input type="text" id="messageInput" placeholder="Type your message..." />
+            <button id="sendBtn">Send</button>
+        </div>
+        <p id="typing"></p>
+        <div class="messages" id="chatMessages"></div>
+    </div>
+
+    <div id="groupSection">
+        <h3>Group Chat Room</h3>
+        <input type="text" id="groupNameInput" placeholder="Enter group name..." />
+        <button id="createGroupBtn">Create Group</button>
+        <button id="joinGroupBtn">Join Group</button>
+        <div id="currentGroup" style="margin-top:10px;"></div>
+        <div style="margin-top:10px;">
+            <input type="text" id="groupMessageInput" placeholder="Type group message..." />
+            <button id="groupSendBtn">Send</button>
+            <div class="messages" id="groupChatMessages"></div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+
+        const sendBtn = document.getElementById("sendBtn");
+        const messageInput = document.getElementById("messageInput");
+        const chatMessages = document.getElementById("chatMessages");
+        const dropdown = document.getElementById('userDropdown');
+
+        let currentGroup = null;
+        const groupNameInput = document.getElementById("groupNameInput");
+        const createGroupBtn = document.getElementById("createGroupBtn");
+        const joinGroupBtn = document.getElementById("joinGroupBtn");
+        const currentGroupSpan = document.getElementById("currentGroup");
+
+        let username = prompt('Enter your name');
+        // console.log(username)
+
+        if (username) {
+            socket.emit('userJoined', username);
+
+        }
+
+        socket.on('userJoined', (msg) => {
+            const msgDiv = document.createElement("div");
+            msgDiv.classList.add("message");
+            msgDiv.innerHTML = `${msg}`;
+            msgDiv.style.textAlign = 'center'
+            chatMessages.appendChild(msgDiv);
+        })
+        socket.on('userList', (userList) => {
+
+            dropdown.innerHTML = '';
+            userList.forEach(user => {
+                if (user !== username) {
+                    const option = document.createElement('option');
+                    option.value = user;
+                    option.textContent = user;
+                    dropdown.appendChild(option);
+                }
+            });
+        });
+
+        function addMessage(user, text, isMine) {
+            const msgDiv = document.createElement("div");
+            msgDiv.classList.add("message", isMine ? "my-message" : "other-message");
+            msgDiv.innerHTML = `<strong>${user}:</strong>  ${text}`;
+            chatMessages.appendChild(msgDiv);
+        }
+
+        sendBtn.addEventListener("click", () => {
+            const message = messageInput.value.trim();
+            const to = dropdown.value;
+
+            if (!username) {
+                alert("Please enter your name!");
+                username = prompt('Enter your name');
+                if (username) {
+                    socket.emit('userJoined', username);
+                }
+                return;
+            }
+            if (!message) return;
+
+            if (to) {
+                addMessage(username, message, true);
+                socket.emit('privateMessage', { to, message })
+                messageInput.value = "";
+            }
+            else {
+                alert('Enter Recipient\'s name')
+            }
+        });
+
+        socket.on('privateMessage', ({ from, message }) => {
+            console.log(from, message)
+            addMessage(from, message, false)
+        });
+
+        let typing;
+        let timeout;
+        messageInput.addEventListener("keypress", (e) => {
+            const to = dropdown.value;
+            if (e.key === "Enter") {
+                sendBtn.click();
+            }
+
+            if (username && to) {
+                typing = true;
+                socket.emit('typing', { user: username, to, typing: true })
+                clearTimeout(timeout)
+                timeout = setTimeout(typingTimeout, 3000)
+
+            }
+
+            function typingTimeout() {
+                typing = false;
+                socket.emit('typing', { user: username, to, typing: false });
+            }
+        });
+        const inputContainer = document.getElementById("typing");
+        socket.on('display', (data) => {
+            inputContainer.textContent = data;
+        })
+        socket.on('hide-typing', (data) => {
+            inputContainer.textContent = data;
+        })
+
+        socket.on('leave', (user) => {
+            console.log(user)
+            const msgDiv = document.createElement("div");
+            msgDiv.classList.add("message");
+            msgDiv.innerHTML = `${user} is left`;
+            msgDiv.style.textAlign = 'center';
+            chatMessages.appendChild(msgDiv);
+        })
+
+        //groupChat
+        createGroupBtn.onclick = function () {
+            if (!username) {
+                alert("Please enter your name!");
+                username = prompt('Enter your name');
+                if (username) {
+                    socket.emit('userJoined', username);
+                }
+                return;
+            }
+            const groupName = groupNameInput.value.trim();
+            if (!groupName) return alert("Enter a group name!");
+            socket.emit('createGroup', groupName);
+        };
+
+        joinGroupBtn.onclick = function () {
+            if (!username) {
+                alert("Please enter your name!");
+                username = prompt('Enter your name');
+                if (username) {
+                    socket.emit('userJoined', username);
+                }
+                return;
+            }
+            const groupName = groupNameInput.value.trim();
+            if (!groupName) return alert("Enter a group name!");
+            socket.emit('joinGroup', groupName);
+        };
+
+        socket.on('groupJoined', (groupName) => {
+            // console.log(groupName)
+            currentGroup = groupName;
+            currentGroupSpan.textContent = `Current Group: ${groupName}`;
+            document.getElementById("groupChatMessages").innerHTML = "";
+        });
+
+        const groupSendBtn = document.getElementById("groupSendBtn");
+        const groupMessageInput = document.getElementById("groupMessageInput");
+        const groupChatMessages = document.getElementById("groupChatMessages");
+
+        function addGroupMessage(user, text) {
+            const msgDiv = document.createElement("div");
+            msgDiv.classList.add("message");
+            msgDiv.innerHTML = `<strong>${user}:</strong> ${text}`;
+            groupChatMessages.appendChild(msgDiv);
+        }
+        groupMessageInput.addEventListener('keypress',(e)=>{
+            if (e.key === "Enter") {
+                groupSendBtn.click();
+            }
+        })
+        groupSendBtn.addEventListener("click", () => {
+            const message = groupMessageInput.value.trim();
+            if (!currentGroup) return alert("Join a group first!");
+            if (!username) {
+                alert("Please enter your name!");
+                username = prompt('Enter your name');
+                if (username) {
+                    socket.emit('userJoined', username);
+                }
+                return;
+            }
+            if (!message) return;
+            addGroupMessage(username, message);
+            socket.emit('groupMessage', { group: currentGroup, username, message });
+            groupMessageInput.value = "";
+        });
+
+        socket.on('groupMessage',(group,from,message)=>{
+            if(from !== username && currentGroup === group){
+                addGroupMessage(from,message)
+            }
+        })
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div>
+        <div>Player 1 : <span class="timer" id="timer1">10</span></div><br>
+        <div>Player 2 : <span class="timer" id="timer2">10</span></div><br>
+        <button id="startBtn">Start</button>
+        <button id="switchTurn">Switch Turn</button>
+        <br><br>
+        <div class="turn" id="turnInfo">Turn: Player 1</div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        
+        const timer1 = document.getElementById('timer1');
+        const timer2 = document.getElementById('timer2');
+        const turnInfo = document.getElementById('turnInfo');
+        const startBtn = document.getElementById('startBtn');
+        const switchTurn = document.getElementById('switchTurn');
+        let active=1;
+        // console.log(timer1.textContent)
+
+        startBtn.onclick = function () {
+            
+            startBtn.disabled = true;
+            socket.emit('startTimer');
+        };
+
+        socket.on('timerUpdate', (time1, time2,newActive) => {
+            console.log(time1,time2)
+            active=newActive
+            updateDisplay(time1, time2);
+        }); 
+
+        function updateDisplay(time1, time2) {
+            timer1.textContent = time1;
+            timer2.textContent = time2;
+            turnInfo.textContent = `Turn: Player ${active}`;
+        }
+
+        socket.on('gameOver',(data)=>{
+            alert(data)
+        })
+        switchTurn.onclick=function(){
+            active = active === 1 ? 2 : 1;
+            turnInfo.textContent = `Turn: Player ${active}`;
+            socket.emit('switchTurn',{timer1:timer1.textContent,timer2:timer2.textContent});
+        }
+    </script>
+</body>
+
+</html>
