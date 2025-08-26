@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <h2>Stone Paper Scissor</h2>
+    <button id="makeYourMove" disabled>Make your move</button>
+     <button id="resetGame" style="display:none;">Reset Game</button>
+    <div id="nameDiv"></div>
+    <div id="showMove"></div>
+    <div id="score"></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        socket.on("connect", () => {
+            console.log("Connected with ID:", socket.id);
+        });
+        const nameDiv = document.getElementById('nameDiv');
+        const makeYourMove = document.getElementById('makeYourMove')
+        const resetGameBtn = document.getElementById('resetGame');
+        const showMove = document.getElementById('showMove')
+        const score = document.getElementById('score')
+
+        let username = prompt('Enter your name');
+
+        if (username) {
+            socket.emit('userJoined', username);
+        }
+        
+        socket.on('joined', (user) => {
+            // console.log(symbol)
+            // myMove = move;
+            nameDiv.innerText = `Welcome ${user}`;
+        })
+
+        socket.on('start',(user)=>{
+            console.log('start');
+            // nameDiv.innerText = `Welcome ${user}`;
+            makeYourMove.disabled = false;
+            score.innerHTML = '';
+            showMove.innerText = '';
+        })
+
+        socket.on('full', (data) => {
+            alert(data);
+            makeYourMove.disabled = true;
+            return;
+        });
+
+        makeYourMove.onclick =()=>{
+            score.innerHTML = '';
+            showMove.innerText = '';
+            socket.emit('generateMove')
+            // makeYourMove.disabled=true;
+        }
+
+        socket.on('showMove',(move)=>{
+            showMove.innerText = `Your move is : ${move}`;
+        })
+
+        socket.on('makeDisable',()=>{
+            makeYourMove.disabled=true;
+        })
+        socket.on('makeUnable',()=>{
+            makeYourMove.disabled=false;
+        })
+ 
+        socket.on('result', ({yourMove,opponentMove,result}) => {
+            score.innerHTML = `  
+                <span style="color:blue">${result}</span>
+            `;  
+            // console.log(yourMove,opponentMove,"log")
+            // if (yourMove !== undefined && opponentMove !== undefined) {
+            //     makeYourMove.disabled = false;
+            // }
+            // makeYourMove.disabled = false;
+        });
+
+        socket.on('gameOver', ({ message, p1Score, p2Score }) => {
+            // alert(message)
+            setTimeout(()=>{alert(message)},1000)
+            makeYourMove.disabled = true;
+            resetGameBtn.style.display = 'inline-block';
+        });
+
+        resetGameBtn.onclick = () => {
+            socket.emit('resetGame');
+            resetGameBtn.style.display = 'none';
+        };
+
+        socket.on('gameReset', () => {
+            score.innerHTML = '';
+            showMove.innerText = '';
+            makeYourMove.disabled = false;
+            resetGameBtn.style.display = 'none';
+        });
+    </script>
+</body>
+
+</html>

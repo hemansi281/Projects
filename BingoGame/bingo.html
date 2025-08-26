@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        /* body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        } */
+
+        /* table {
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+
+        td {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #333;
+            font-size: 20px;
+            cursor: pointer;
+            background: #f9f9f9;
+        } */
+
+        .bingoBoard {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            gap: 5px;
+            /* justify-content: center; */
+            margin-top: 20px;
+        }
+
+        .cell {
+            border: 1px solid #333;
+            padding: 20px;
+            /* cursor: pointer; */
+        }
+
+        .marked {
+            background: lightgreen;
+        }
+
+        /* 
+        td.marked {
+            background: #90ee90;
+        } */
+    </style>
+</head>
+
+<body>
+    <h2>Bingo</h2>
+    <div id="nameDiv"></div>
+    <!-- <button id="startBtn" disabled>Start Game</button> -->
+    <button id="resetGame" style="display: none;">Reset Game</button>
+    <table class="bingoBoard" id="bingoBoard"></table>
+    <div id="linesCount"></div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        socket.on("connect", () => {
+            console.log("Connected with ID:", socket.id);
+        });
+
+        let username = prompt('Enter your name');
+        let currTurn;
+        const resetGameBtn = document.getElementById('resetGame');
+        const container = document.getElementById("bingoBoard");
+        const linesCountDiv = document.getElementById('linesCount');
+
+        // const startBtn = document.getElementById('startBtn');
+
+        if (username) {
+            socket.emit('userJoined', username);
+        }
+
+        socket.on('joined', (user) => {
+            // console.log(symbol)
+            // myMove = move;
+            nameDiv.innerText = `Welcome ${user}`;
+        })
+
+        socket.on('start', ({ user }) => {
+            // console.log('start');
+            // nameDiv.innerText = `Welcome ${user}`;
+            // startBtn.disabled = false;
+            // score.innerHTML = '';
+            // showMove.innerText = '';
+            currTurn = user;
+            console.log(currTurn, "curr")
+            const board = generateBoard();
+        })
+
+        socket.on('full', (data) => {
+            alert(data);
+            // makeYourMove.disabled = true;
+            return;
+        });
+
+        function generateBoard() {
+            let nums = Array.from({ length: 25 }, (_, i) => i + 1); //filled with 1 to 25. The value of first param is undefined 
+            nums.sort(() => 0.5 - Math.random());   //shuffle the array
+            // board = [];
+            container.innerHTML = "";
+            let localBoard = [];
+            // console.log(nums)
+
+            nums.forEach(num => {
+                const cell = document.createElement("div");
+                cell.innerText = num;
+                cell.classList.add("cell");
+                container.appendChild(cell);
+                localBoard.push({ num: num, marked: false });
+
+
+                cell.addEventListener("click", () => {
+                    if (currTurn === username) {
+                        socket.emit("cellClick", { number: num, localBoard });
+                    }
+                });
+            })
+
+            console.log(localBoard, "local")
+            socket.emit("saveBoard", localBoard);
+        }
+
+        socket.on('updateBoard', ({ updateBoard, number, currPlayer }) => {
+            currTurn = currPlayer;
+            const cells = document.querySelectorAll(".cell");
+            cells.forEach((cell) => {
+                if (parseInt(cell.innerText) === number) {
+                    cell.classList.add("marked");
+                }
+            });
+
+        })
+
+        socket.on('showLineCount',(linesCount)=>{
+            console.log('linesss')
+            linesCountDiv.innerText = `${linesCount} lines completed`;
+        })
+
+        socket.on('winner', ({ winner }) => {
+            alert(`Winner is : ${winner}`)
+            resetGameBtn.style.display = 'inline-block';
+            container.innerHTML='';
+            linesCountDiv.innerHTML='';
+            return;
+            // console.log(winner,"winnner")
+        })
+
+        resetGameBtn.onclick = () => {
+            socket.emit('resetGame');
+        };
+        
+        socket.on('gameReset',()=>{
+            resetGameBtn.style.display = 'none';
+            generateBoard();
+        })
+
+    
+
+    </script>
+
+</body>
+
+</html>
